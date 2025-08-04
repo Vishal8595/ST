@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Warehouse Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .loading { 
+            display: inline-block; 
+            width: 20px; 
+            height: 20px; 
+            border: 3px solid #f3f3f3; 
+            border-top: 3px solid #3498db; 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Print styles */
+        @media print {
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+            .print-header { display: block !important; }
+        }
+        
+        .print-header { display: none; }
+        
+        .print-area {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">📦 Stock Warehouse Management</h1>
+                    <p class="text-gray-600">Manage inventory, track transactions, and maintain item ledgers</p>
+                </div>
+                <div class="text-right">
+                    <div id="sync-status" class="text-sm text-gray-500 mb-2">🔄 Ready to sync</div>
+                    <button onclick="setupGoogleSheets()" id="setup-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm">
+                        📊 Setup Google Sheets
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Google Sheets Setup Modal -->
+        <div id="setup-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+            <div class="bg-white rounded-xl p-6 max-w-2xl w-full mx-4">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">📊 Google Sheets Database Setup</h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Google Sheets URL</label>
+                        <input type="url" id="sheets-url" placeholder="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit" 
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <p class="text-xs text-gray-500 mt-1">Paste your Google Sheets URL here</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Google Apps Script Web App URL</label>
+                        <input type="url" id="webapp-url" placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec" 
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <p class="text-xs text-gray-500 mt-1">Your Google Apps Script deployment URL</p>
+                    </div>
+                    
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h4 class="font-medium text-blue-800 mb-2">📋 Setup Instructions:</h4>
+                        <ol class="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+                            <li>Create a new Google Sheet with sheets named: "Inventory" and "Transactions"</li>
+                            <li>In Inventory sheet, add headers: ID, Name, Category, Quantity, Price</li>
+                            <li>In Transactions sheet, add headers: ID, ItemID, ItemName, Type, Quantity, Date, Notes</li>
+                            <li>Go to Extensions → Apps Script</li>
+                            <li>Copy and paste the provided Google Apps Script code</li>
+                            <li>Deploy as web app with "Anyone" access</li>
+                            <li>Copy both URLs here</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-medium text-gray-800 mb-2">📝 Google Apps Script Code:</h4>
+                        <textarea readonly class="w-full h-32 text-xs font-mono bg-white border rounded p-2" id="script-code">
+function doGet(e) {
+  return handleRequest(e);
+}
+
+function doPost(e) {
+  return handleRequest(e);
+}
+
+function handleRequest(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const action = e.parameter.action;
+  
+  try {
+    switch(action) {
+      case 'getInventory':
+        return getInventory(ss);
+      case 'getTransactions':
+        return getTransactions(ss);
+      case 'addItem':
+        return addItem(ss, e.parameter);
+      case 'updateItem':
+        return updateItem(ss, e.parameter);
+      case 'addTransaction':
+        return addTransaction(ss, e.parameter);
+      case 'updateTransaction':
+        return updateTransaction(ss, e.parameter);
+      case 'deleteItem':
+        return deleteItem(ss, e.parameter);
+      case 'deleteTransaction':
+        return deleteTransaction(ss, e.parameter);
+      default:
+        return ContentService.createTextOutput(JSON.stringify({success: false, error: 'Invalid action'})).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch(error) {
+    return ContentService.createTextOutput(JSON.stringify({success: false, error: error.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function getInventory(ss) {
+  const sheet = ss.getSheetByName('Inventory');
+  if (!sheet) return ContentService.createTextOutput(JSON.stringify({success: false, error: 'Inventory sheet not found'})).setMimeType(ContentService.MimeType.JSON);
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rows = data.slice(1);
+  
+  const inventory = rows.map(row => ({
+    id: row[0],
+    name: row[1],
+    category: row[2],
+    quantity: row[3],
+    price: row[4]
+  }));
+  
+  return ContentService.createTextOutput(JSON.stringify({success: true, data: inventory})).setMimeType(ContentService.MimeType.JSON);
+}
+
+function getTransactions(ss) {
+  const sheet = ss.getSheetByName('Transactions');
+  if (!sheet) return ContentService.createTextOutput(JSON.stringify({success: false, error: 'Transactions sheet not found'})).setMimeType(ContentService.MimeType.JSON);
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rows = data.slice(1);
+  
+  const transactions = rows.map(row => ({
+    id: row[0],
+    itemId: row[1],
+    itemName: row[2],
+    type: row[3],
+    quantity: row[4],
+    date: row[5],
+    notes: row[6]
+  }));
+  
+  return ContentService.createTextOutput(JSON.stringify({success: true, data: transactions})).setMimeType(ContentService.MimeType.JSON);
+}
+
+function addItem(ss, params) {
+  const sheet = ss.getSheetByName('Inventory');
+  const id = new Date().getTime();
+  sheet.appendRow([id, params.name, params.category, parseInt(params.quantity), parseFloat(params.price)]);
+  return ContentService.createTextOutput(JSON.stringify({success: true, id: id})).setMimeType(ContentService.MimeType.JSON);
+}
+
+function updateItem(ss, params) {
+  const sheet = ss.getSheetByName('Inventory');
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == params.id) {
+      sheet.getRange(i + 1, 2, 1, 4).setValues([[params.name, params.category, parseInt(params.quantity), parseFloat(params.price)]]);
+      break;
+    }
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+}
+
+function addTransaction(ss, params) {
+  const sheet = ss.getSheetByName('Transactions');
+  const id = new Date().getTime();
+  sheet.appendRow([id, params.itemId, params.itemName, params.type, parseInt(params.quantity), params.date, params.notes]);
+  return ContentService.createTextOutput(JSON.stringify({success: true, id: id})).setMimeType(ContentService.MimeType.JSON);
+}
+
+function updateTransaction(ss, params) {
+  const sheet = ss.getSheetByName('Transactions');
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == params.id) {
+      sheet.getRange(i + 1, 2, 1, 6).setValues([[params.itemId, params.itemName, params.type, parseInt(params.quantity), params.date, params.notes]]);
+      break;
+    }
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+}
+
+function deleteItem(ss, params) {
+  const sheet = ss.getSheetByName('Inventory');
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == params.id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+}
+
+function deleteTransaction(ss, params) {
+  const sheet = ss.getSheetByName('Transactions');
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] == params.id) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+}
+                        </textarea>
+                        <button onclick="copyScriptCode()" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                            📋 Copy Code
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button onclick="closeSetupModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button onclick="saveGoogleSheetsConfig()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        💾 Save Configuration
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-white rounded-xl shadow-lg mb-8">
+            <div class="flex border-b">
+                <button onclick="showTab('dashboard')" id="tab-dashboard" class="px-6 py-4 font-medium text-blue-600 border-b-2 border-blue-600">Dashboard</button>
+                <button onclick="showTab('inventory')" id="tab-inventory" class="px-6 py-4 font-medium text-gray-500 hover:text-gray-700">Inventory</button>
+                <button onclick="showTab('transactions')" id="tab-transactions" class="px-6 py-4 font-medium text-gray-500 hover:text-gray-700">Transactions</button>
+                <button onclick="showTab('ledger')" id="tab-ledger" class="px-6 py-4 font-medium text-gray-500 hover:text-gray-700">Item Ledger</button>
+            </div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard-content" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Items</p>
+                            <p class="text-2xl font-bold text-gray-800" id="total-items">0</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <span class="text-2xl">📋</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Stock Value</p>
+                            <p class="text-2xl font-bold text-gray-800" id="total-value">₹ 0</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <span class="text-2xl">💰</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Low Stock Items</p>
+                            <p class="text-2xl font-bold text-red-600" id="low-stock">0</p>
+                        </div>
+                        <div class="bg-red-100 p-3 rounded-full">
+                            <span class="text-2xl">⚠️</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">Recent Transactions</h3>
+                    <button onclick="syncWithGoogleSheets()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm">
+                        🔄 Sync Data
+                    </button>
+                </div>
+                <div id="recent-transactions" class="space-y-3">
+                    <p class="text-gray-500">No recent transactions</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Tab -->
+        <div id="inventory-content" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4" id="form-title">Add New Item</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <input type="text" id="item-name" placeholder="Item Name" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="text" id="item-category" placeholder="Category" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="number" id="item-quantity" placeholder="Quantity" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="number" id="item-price" placeholder="Unit Price (₹)" step="0.01" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <div class="mt-4">
+                    <button onclick="saveItem()" id="save-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                        <span id="save-btn-text">Add Item</span>
+                        <span id="save-btn-loading" class="loading hidden ml-2"></span>
+                    </button>
+                    <button onclick="cancelEdit()" id="cancel-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors ml-2 hidden">Cancel</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">Current Inventory</h3>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-gray-600">🔍</span>
+                        <input type="text" id="inventory-search" placeholder="Search items..." class="border border-gray-300 rounded-lg px-4 py-2 w-64 focus:ring-2 focus:ring-blue-500 focus:border-transparent" onkeyup="searchInventory()">
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Item Name</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Category</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Quantity</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Unit Price</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Total Value</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Status</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table">
+                            <tr>
+                                <td colspan="7" class="text-center py-8 text-gray-500">No items in inventory</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Tab -->
+        <div id="transactions-content" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4" id="transaction-form-title">Record Transaction</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="relative">
+                        <input type="text" id="transaction-item-search" placeholder="Search and select item..." class="border border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent" onclick="toggleItemDropdown()" onkeyup="filterTransactionItems()">
+                        <div id="transaction-item-dropdown" class="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto hidden shadow-lg">
+                            <div class="p-2 text-gray-500 text-sm">No items found</div>
+                        </div>
+                        <input type="hidden" id="transaction-item" value="">
+                    </div>
+                    <select id="transaction-type" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="in">Stock In</option>
+                        <option value="out">Stock Out</option>
+                    </select>
+                    <input type="number" id="transaction-quantity" placeholder="Quantity" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="text" id="transaction-notes" placeholder="Notes (optional)" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <div class="mt-4">
+                    <button onclick="recordTransaction()" id="transaction-save-btn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                        <span id="transaction-save-btn-text">Record Transaction</span>
+                        <span id="transaction-save-btn-loading" class="loading hidden ml-2"></span>
+                    </button>
+                    <button onclick="cancelTransactionEdit()" id="transaction-cancel-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors ml-2 hidden">Cancel</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Transaction History</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Date</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Item</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Type</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Quantity</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Notes</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactions-table">
+                            <tr>
+                                <td colspan="6" class="text-center py-8 text-gray-500">No transactions recorded</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ledger Tab -->
+        <div id="ledger-content" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Item Ledger Filter</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <select id="ledger-item-filter" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Items</option>
+                    </select>
+                    <input type="date" id="ledger-date-from" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="date" id="ledger-date-to" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <div class="mt-4">
+                    <button onclick="filterLedger()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">Apply Filter</button>
+                    <button onclick="exportLedger()" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-medium transition-colors ml-2">📊 Export CSV</button>
+                    <button onclick="exportLedgerPDF()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors ml-2">📄 Export PDF</button>
+                    <button onclick="printLedger()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors ml-2">🖨️ Print</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 no-print">Item Ledger</h3>
+                
+                <!-- Print Header (hidden by default, shown only when printing) -->
+                <div class="print-header text-center mb-6">
+                    <h1 class="text-2xl font-bold text-gray-800 mb-2">📦 Stock Warehouse Management System</h1>
+                    <h2 class="text-xl font-semibold text-gray-700 mb-4">Item Ledger Report</h2>
+                    <div class="text-sm text-gray-600 mb-4">
+                        <p>Generated on: <span id="print-date"></span></p>
+                        <p id="print-filters"></p>
+                    </div>
+                </div>
+                
+                <div class="print-area">
+                    <div class="overflow-x-auto">
+                        <table class="w-full" id="ledger-print-table">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="text-left py-3 px-4 font-medium text-gray-700">Date</th>
+                                    <th class="text-left py-3 px-4 font-medium text-gray-700">Item</th>
+                                    <th class="text-left py-3 px-4 font-medium text-gray-700">Transaction</th>
+                                    <th class="text-left py-3 px-4 font-medium text-gray-700">In</th>
+                                    <th class="text-left py-3 px-4 font-medium text-gray-700">Out</th>
+                                    <th class="text-left py-3 px-4 font-medium text-gray-700">Balance</th>
+                                    <th class="text-left py-3 px-4 font-medium text-gray-700">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ledger-table">
+                                <tr>
+                                    <td colspan="7" class="text-center py-8 text-gray-500">No ledger entries</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data storage
+        let inventory = [];
+        let transactions = [];
+        let currentTab = 'dashboard';
+        let editingItemId = null;
+        let editingTransactionId = null;
+        let googleSheetsConfig = {
+            sheetsUrl: '',
+            webAppUrl: ''
+        };
+
+        // Load configuration from localStorage
+        function loadConfig() {
+            const saved = localStorage.getItem('googleSheetsConfig');
+            if (saved) {
+                googleSheetsConfig = JSON.parse(saved);
+                updateSyncStatus('📊 Connected to Google Sheets');
+                document.getElementById('setup-btn').textContent = '⚙️ Reconfigure';
+                // Auto-sync on load
+                syncWithGoogleSheets();
+            }
+        }
+
+        // Google Sheets Setup
+        function setupGoogleSheets() {
+            document.getElementById('setup-modal').classList.remove('hidden');
+            if (googleSheetsConfig.sheetsUrl) {
+                document.getElementById('sheets-url').value = googleSheetsConfig.sheetsUrl;
+            }
+            if (googleSheetsConfig.webAppUrl) {
+                document.getElementById('webapp-url').value = googleSheetsConfig.webAppUrl;
+            }
+        }
+
+        function closeSetupModal() {
+            document.getElementById('setup-modal').classList.add('hidden');
+        }
+
+        function copyScriptCode() {
+            const textarea = document.getElementById('script-code');
+            textarea.select();
+            document.execCommand('copy');
+            showNotification('Google Apps Script code copied to clipboard!', 'success');
+        }
+
+        function saveGoogleSheetsConfig() {
+            const sheetsUrl = document.getElementById('sheets-url').value.trim();
+            const webAppUrl = document.getElementById('webapp-url').value.trim();
+
+            if (!sheetsUrl || !webAppUrl) {
+                alert('Please fill in both URLs');
+                return;
+            }
+
+            googleSheetsConfig = { sheetsUrl, webAppUrl };
+            localStorage.setItem('googleSheetsConfig', JSON.stringify(googleSheetsConfig));
+            
+            closeSetupModal();
+            updateSyncStatus('📊 Connected to Google Sheets');
+            document.getElementById('setup-btn').textContent = '⚙️ Reconfigure';
+            
+            showNotification('Google Sheets configuration saved!', 'success');
+            syncWithGoogleSheets();
+        }
+
+        // Sync functions
+        async function syncWithGoogleSheets() {
+            if (!googleSheetsConfig.webAppUrl) {
+                showNotification('Please setup Google Sheets first', 'error');
+                return;
+            }
+
+            updateSyncStatus('🔄 Syncing...');
+            
+            try {
+                // Load inventory
+                const inventoryResponse = await fetch(`${googleSheetsConfig.webAppUrl}?action=getInventory`);
+                const inventoryData = await inventoryResponse.json();
+                
+                if (inventoryData.success) {
+                    inventory = inventoryData.data.filter(item => item.id); // Filter out empty rows
+                }
+
+                // Load transactions
+                const transactionsResponse = await fetch(`${googleSheetsConfig.webAppUrl}?action=getTransactions`);
+                const transactionsData = await transactionsResponse.json();
+                
+                if (transactionsData.success) {
+                    transactions = transactionsData.data.filter(transaction => transaction.id); // Filter out empty rows
+                }
+
+                updateAllDisplays();
+                updateSyncStatus('✅ Synced successfully');
+                showNotification('Data synced with Google Sheets!', 'success');
+                
+            } catch (error) {
+                console.error('Sync error:', error);
+                updateSyncStatus('❌ Sync failed');
+                showNotification('Failed to sync with Google Sheets', 'error');
+            }
+        }
+
+        async function saveToGoogleSheets(action, data) {
+            if (!googleSheetsConfig.webAppUrl) {
+                showNotification('Google Sheets not configured', 'error');
+                return false;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('action', action);
+                
+                Object.keys(data).forEach(key => {
+                    formData.append(key, data[key]);
+                });
+
+                const response = await fetch(googleSheetsConfig.webAppUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                return result.success;
+                
+            } catch (error) {
+                console.error('Save error:', error);
+                return false;
+            }
+        }
+
+        function updateSyncStatus(status) {
+            document.getElementById('sync-status').textContent = status;
+        }
+
+        // Tab management
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('[id^="tab-"]').forEach(btn => {
+                btn.classList.remove('text-blue-600', 'border-blue-600');
+                btn.classList.add('text-gray-500');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-content').classList.remove('hidden');
+            document.getElementById('tab-' + tabName).classList.add('text-blue-600', 'border-blue-600');
+            document.getElementById('tab-' + tabName).classList.remove('text-gray-500');
+            
+            currentTab = tabName;
+            
+            if (tabName === 'transactions') {
+                updateTransactionItemSelect();
+            }
+            if (tabName === 'ledger') {
+                updateLedgerItemSelect();
+                updateLedgerDisplay();
+            }
+        }
+
+        // Save item (add or edit)
+        async function saveItem() {
+            const name = document.getElementById('item-name').value.trim();
+            const category = document.getElementById('item-category').value.trim();
+            const quantity = parseInt(document.getElementById('item-quantity').value) || 0;
+            const price = parseFloat(document.getElementById('item-price').value) || 0;
+
+            if (!name || !category) {
+                alert('Please fill in item name and category');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('save-btn-text').textContent = 'Saving...';
+            document.getElementById('save-btn-loading').classList.remove('hidden');
+
+            try {
+                if (editingItemId) {
+                    // Edit existing item
+                    const success = await saveToGoogleSheets('updateItem', {
+                        id: editingItemId,
+                        name,
+                        category,
+                        quantity,
+                        price
+                    });
+
+                    if (success) {
+                        const item = inventory.find(i => i.id === editingItemId);
+                        if (item) {
+                            item.name = name;
+                            item.category = category;
+                            item.quantity = quantity;
+                            item.price = price;
+                        }
+                        showNotification('Item updated successfully!', 'success');
+                        cancelEdit();
+                    } else {
+                        showNotification('Failed to update item', 'error');
+                    }
+                } else {
+                    // Add new item
+                    const success = await saveToGoogleSheets('addItem', {
+                        name,
+                        category,
+                        quantity,
+                        price
+                    });
+
+                    if (success) {
+                        const newItem = {
+                            id: Date.now(),
+                            name,
+                            category,
+                            quantity,
+                            price
+                        };
+                        inventory.push(newItem);
+                        showNotification('Item added successfully!', 'success');
+                    } else {
+                        showNotification('Failed to add item', 'error');
+                    }
+                }
+                
+                // Clear form and update displays
+                clearForm();
+                updateAllDisplays();
+                
+            } finally {
+                // Hide loading
+                document.getElementById('save-btn-text').textContent = editingItemId ? 'Update Item' : 'Add Item';
+                document.getElementById('save-btn-loading').classList.add('hidden');
+            }
+        }
+
+        // Record transaction
+        async function recordTransaction() {
+            const itemId = parseInt(document.getElementById('transaction-item').value);
+            const type = document.getElementById('transaction-type').value;
+            const quantity = parseInt(document.getElementById('transaction-quantity').value) || 0;
+            const notes = document.getElementById('transaction-notes').value.trim();
+
+            if (!itemId || quantity <= 0) {
+                alert('Please select an item and enter a valid quantity');
+                return;
+            }
+
+            const item = inventory.find(i => i.id === itemId);
+            if (!item) {
+                alert('Item not found');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('transaction-save-btn-text').textContent = 'Saving...';
+            document.getElementById('transaction-save-btn-loading').classList.remove('hidden');
+
+            try {
+                if (editingTransactionId) {
+                    // Edit existing transaction
+                    const transaction = transactions.find(t => t.id === editingTransactionId);
+                    if (!transaction) {
+                        alert('Transaction not found');
+                        return;
+                    }
+
+                    // Reverse the old transaction effect on inventory
+                    const oldItem = inventory.find(i => i.id === transaction.itemId);
+                    if (oldItem) {
+                        if (transaction.type === 'in') {
+                            oldItem.quantity -= transaction.quantity;
+                        } else {
+                            oldItem.quantity += transaction.quantity;
+                        }
+                    }
+
+                    // Check if new transaction is valid
+                    if (type === 'out' && item.quantity < quantity) {
+                        // Restore old transaction effect
+                        if (transaction.type === 'in') {
+                            oldItem.quantity += transaction.quantity;
+                        } else {
+                            oldItem.quantity -= transaction.quantity;
+                        }
+                        alert('Insufficient stock! Available: ' + item.quantity);
+                        return;
+                    }
+
+                    // Apply new transaction effect
+                    if (type === 'in') {
+                        item.quantity += quantity;
+                    } else {
+                        item.quantity -= quantity;
+                    }
+
+                    // Update in Google Sheets
+                    const success = await saveToGoogleSheets('updateTransaction', {
+                        id: editingTransactionId,
+                        itemId: item.id,
+                        itemName: item.name,
+                        type,
+                        quantity,
+                        date: new Date().toISOString().split('T')[0],
+                        notes
+                    });
+
+                    if (success) {
+                        // Update local transaction
+                        transaction.itemId = item.id;
+                        transaction.itemName = item.name;
+                        transaction.type = type;
+                        transaction.quantity = quantity;
+                        transaction.notes = notes;
+
+                        // Update item in Google Sheets
+                        await saveToGoogleSheets('updateItem', {
+                            id: item.id,
+                            name: item.name,
+                            category: item.category,
+                            quantity: item.quantity,
+                            price: item.price
+                        });
+
+                        showNotification('Transaction updated successfully!', 'success');
+                        cancelTransactionEdit();
+                    } else {
+                        showNotification('Failed to update transaction', 'error');
+                    }
+                } else {
+                    // Add new transaction
+                    if (type === 'out' && item.quantity < quantity) {
+                        alert('Insufficient stock! Available: ' + item.quantity);
+                        return;
+                    }
+
+                    // Update inventory
+                    if (type === 'in') {
+                        item.quantity += quantity;
+                    } else {
+                        item.quantity -= quantity;
+                    }
+
+                    // Save transaction to Google Sheets
+                    const success = await saveToGoogleSheets('addTransaction', {
+                        itemId: item.id,
+                        itemName: item.name,
+                        type,
+                        quantity,
+                        date: new Date().toISOString().split('T')[0],
+                        notes
+                    });
+
+                    if (success) {
+                        // Add to local transactions
+                        const transaction = {
+                            id: Date.now(),
+                            itemId: item.id,
+                            itemName: item.name,
+                            type,
+                            quantity,
+                            date: new Date().toISOString().split('T')[0],
+                            notes
+                        };
+                        transactions.push(transaction);
+
+                        // Update item in Google Sheets
+                        await saveToGoogleSheets('updateItem', {
+                            id: item.id,
+                            name: item.name,
+                            category: item.category,
+                            quantity: item.quantity,
+                            price: item.price
+                        });
+
+                        showNotification('Transaction recorded successfully!', 'success');
+                    } else {
+                        showNotification('Failed to record transaction', 'error');
+                    }
+                }
+
+                // Clear form and update displays
+                clearTransactionForm();
+                updateAllDisplays();
+                
+            } finally {
+                // Hide loading
+                document.getElementById('transaction-save-btn-text').textContent = editingTransactionId ? 'Update Transaction' : 'Record Transaction';
+                document.getElementById('transaction-save-btn-loading').classList.add('hidden');
+            }
+        }
+
+        // Edit item
+        function editItem(id) {
+            const item = inventory.find(i => i.id === id);
+            if (!item) return;
+
+            editingItemId = id;
+            
+            // Fill form with item data
+            document.getElementById('item-name').value = item.name;
+            document.getElementById('item-category').value = item.category;
+            document.getElementById('item-quantity').value = item.quantity;
+            document.getElementById('item-price').value = item.price;
+            
+            // Update UI for edit mode
+            document.getElementById('form-title').textContent = 'Edit Item';
+            document.getElementById('save-btn-text').textContent = 'Update Item';
+            document.getElementById('save-btn').className = 'bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-medium transition-colors';
+            document.getElementById('cancel-btn').classList.remove('hidden');
+        }
+
+        // Delete item
+        async function deleteItem(id) {
+            const item = inventory.find(i => i.id === id);
+            if (!item) {
+                showNotification('Item not found!', 'error');
+                return;
+            }
+
+            // Check if item has transactions
+            const itemTransactions = transactions.filter(t => t.itemId === id);
+            if (itemTransactions.length > 0) {
+                const confirmDelete = confirm(`This item "${item.name}" has ${itemTransactions.length} transaction(s) associated with it. Deleting this item will also remove all its transactions. Are you sure you want to continue?`);
+                if (!confirmDelete) return;
+            } else {
+                const confirmDelete = confirm(`Are you sure you want to delete "${item.name}"? This action cannot be undone.`);
+                if (!confirmDelete) return;
+            }
+
+            try {
+                // Delete from Google Sheets (if configured)
+                if (googleSheetsConfig.webAppUrl) {
+                    const success = await saveToGoogleSheets('deleteItem', { id: id });
+                    if (!success) {
+                        showNotification('Failed to delete item from Google Sheets', 'error');
+                        return;
+                    }
+
+                    // Also delete associated transactions from Google Sheets
+                    if (itemTransactions.length > 0) {
+                        for (const transaction of itemTransactions) {
+                            await saveToGoogleSheets('deleteTransaction', { id: transaction.id });
+                        }
+                    }
+                }
+
+                // Remove from local inventory
+                const itemIndex = inventory.findIndex(i => i.id === id);
+                if (itemIndex > -1) {
+                    inventory.splice(itemIndex, 1);
+                }
+
+                // Remove associated transactions from local storage
+                if (itemTransactions.length > 0) {
+                    itemTransactions.forEach(transaction => {
+                        const transactionIndex = transactions.findIndex(t => t.id === transaction.id);
+                        if (transactionIndex > -1) {
+                            transactions.splice(transactionIndex, 1);
+                        }
+                    });
+                }
+
+                // Update all displays
+                updateAllDisplays();
+                
+                showNotification(`Item "${item.name}" deleted successfully!`, 'success');
+                
+                // If we were editing this item, cancel the edit
+                if (editingItemId === id) {
+                    cancelEdit();
+                }
+
+            } catch (error) {
+                console.error('Delete error:', error);
+                showNotification('Failed to delete item', 'error');
+            }
+        }
+
+        // Edit transaction
+        function editTransaction(id) {
+            const transaction = transactions.find(t => t.id === id);
+            if (!transaction) return;
+
+            editingTransactionId = id;
+            
+            // Fill form with transaction data
+            const item = inventory.find(i => i.id === transaction.itemId);
+            if (item) {
+                document.getElementById('transaction-item').value = transaction.itemId;
+                document.getElementById('transaction-item-search').value = `${transaction.itemName} (Stock: ${item.quantity})`;
+            }
+            document.getElementById('transaction-type').value = transaction.type;
+            document.getElementById('transaction-quantity').value = transaction.quantity;
+            document.getElementById('transaction-notes').value = transaction.notes || '';
+            
+            // Update UI for edit mode
+            document.getElementById('transaction-form-title').textContent = 'Edit Transaction';
+            document.getElementById('transaction-save-btn-text').textContent = 'Update Transaction';
+            document.getElementById('transaction-save-btn').className = 'bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-medium transition-colors';
+            document.getElementById('transaction-cancel-btn').classList.remove('hidden');
+        }
+
+        // Cancel edit
+        function cancelEdit() {
+            editingItemId = null;
+            clearForm();
+            
+            // Reset UI to add mode
+            document.getElementById('form-title').textContent = 'Add New Item';
+            document.getElementById('save-btn-text').textContent = 'Add Item';
+            document.getElementById('save-btn').className = 'bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors';
+            document.getElementById('cancel-btn').classList.add('hidden');
+        }
+
+        // Cancel transaction edit
+        function cancelTransactionEdit() {
+            editingTransactionId = null;
+            clearTransactionForm();
+            
+            // Reset UI to add mode
+            document.getElementById('transaction-form-title').textContent = 'Record Transaction';
+            document.getElementById('transaction-save-btn-text').textContent = 'Record Transaction';
+            document.getElementById('transaction-save-btn').className = 'bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors';
+            document.getElementById('transaction-cancel-btn').classList.add('hidden');
+        }
+
+        // Clear forms
+        function clearForm() {
+            document.getElementById('item-name').value = '';
+            document.getElementById('item-category').value = '';
+            document.getElementById('item-quantity').value = '';
+            document.getElementById('item-price').value = '';
+        }
+
+        function clearTransactionForm() {
+            document.getElementById('transaction-item').value = '';
+            document.getElementById('transaction-item-search').value = '';
+            document.getElementById('transaction-quantity').value = '';
+            document.getElementById('transaction-notes').value = '';
+        }
+
+        // Update displays
+        function updateAllDisplays() {
+            updateDashboard();
+            updateInventoryTable();
+            updateTransactionsTable();
+            updateLedgerDisplay();
+        }
+
+        function updateDashboard() {
+            const totalItems = inventory.length;
+            const totalValue = inventory.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+            const lowStockItems = inventory.filter(item => item.quantity < 10).length;
+
+            document.getElementById('total-items').textContent = totalItems;
+            document.getElementById('total-value').textContent = '₹ ' + totalValue.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('low-stock').textContent = lowStockItems;
+
+            // Recent transactions
+            const recentTransactions = transactions.slice(-5).reverse();
+            const recentHtml = recentTransactions.length > 0 
+                ? recentTransactions.map(t => `
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <div>
+                            <span class="font-medium">${t.itemName}</span>
+                            <span class="text-sm text-gray-500 ml-2">${t.type === 'in' ? '📥' : '📤'} ${t.quantity}</span>
+                        </div>
+                        <span class="text-sm text-gray-500">${t.date}</span>
+                    </div>
+                `).join('')
+                : '<p class="text-gray-500">No recent transactions</p>';
+            
+            document.getElementById('recent-transactions').innerHTML = recentHtml;
+        }
+
+        function updateInventoryTable() {
+            document.getElementById('inventory-search').value = '';
+            updateInventoryTableWithData(inventory);
+        }
+
+        function updateInventoryTableWithData(data) {
+            const tbody = document.getElementById('inventory-table');
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No items found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(item => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4 font-medium">${item.name}</td>
+                    <td class="py-3 px-4">${item.category}</td>
+                    <td class="py-3 px-4">${item.quantity}</td>
+                    <td class="py-3 px-4">₹ ${parseFloat(item.price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="py-3 px-4">₹ ${(item.quantity * parseFloat(item.price)).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                            item.quantity < 10 ? 'bg-red-100 text-red-800' : 
+                            item.quantity < 50 ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-green-100 text-green-800'
+                        }">
+                            ${item.quantity < 10 ? 'Low Stock' : item.quantity < 50 ? 'Medium' : 'Good'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <button onclick="editItem(${item.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors mr-2">
+                            ✏️ Edit
+                        </button>
+                        <button onclick="deleteItem(${item.id})" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors">
+                            🗑️ Delete
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateTransactionItemSelect() {
+            const dropdown = document.getElementById('transaction-item-dropdown');
+            if (inventory.length === 0) {
+                dropdown.innerHTML = '<div class="p-2 text-gray-500 text-sm">No items available</div>';
+                return;
+            }
+            
+            dropdown.innerHTML = inventory.map(item => `
+                <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0" onclick="selectTransactionItem(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.quantity})">
+                    <div class="font-medium text-gray-800">${item.name}</div>
+                    <div class="text-sm text-gray-500">Stock: ${item.quantity} | Category: ${item.category}</div>
+                </div>
+            `).join('');
+        }
+
+        function toggleItemDropdown() {
+            const dropdown = document.getElementById('transaction-item-dropdown');
+            const searchInput = document.getElementById('transaction-item-search');
+            
+            if (dropdown.classList.contains('hidden')) {
+                updateTransactionItemSelect();
+                dropdown.classList.remove('hidden');
+                searchInput.focus();
+            } else {
+                dropdown.classList.add('hidden');
+            }
+        }
+
+        function filterTransactionItems() {
+            const searchTerm = document.getElementById('transaction-item-search').value.toLowerCase();
+            const dropdown = document.getElementById('transaction-item-dropdown');
+            
+            if (searchTerm === '') {
+                updateTransactionItemSelect();
+                return;
+            }
+            
+            const filteredItems = inventory.filter(item => 
+                item.name.toLowerCase().includes(searchTerm) ||
+                item.category.toLowerCase().includes(searchTerm)
+            );
+            
+            if (filteredItems.length === 0) {
+                dropdown.innerHTML = '<div class="p-2 text-gray-500 text-sm">No items found</div>';
+                return;
+            }
+            
+            dropdown.innerHTML = filteredItems.map(item => `
+                <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0" onclick="selectTransactionItem(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.quantity})">
+                    <div class="font-medium text-gray-800">${item.name}</div>
+                    <div class="text-sm text-gray-500">Stock: ${item.quantity} | Category: ${item.category}</div>
+                </div>
+            `).join('');
+            
+            dropdown.classList.remove('hidden');
+        }
+
+        function selectTransactionItem(id, name, stock) {
+            document.getElementById('transaction-item').value = id;
+            document.getElementById('transaction-item-search').value = `${name} (Stock: ${stock})`;
+            document.getElementById('transaction-item-dropdown').classList.add('hidden');
+        }
+
+        function updateTransactionsTable() {
+            const tbody = document.getElementById('transactions-table');
+            
+            if (transactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No transactions recorded</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = transactions.slice().reverse().map(t => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4">${t.date}</td>
+                    <td class="py-3 px-4 font-medium">${t.itemName}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                            t.type === 'in' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }">
+                            ${t.type === 'in' ? '📥 Stock In' : '📤 Stock Out'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">${t.quantity}</td>
+                    <td class="py-3 px-4">${t.notes || '-'}</td>
+                    <td class="py-3 px-4">
+                        <button onclick="editTransaction(${t.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors">
+                            ✏️ Edit
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateLedgerItemSelect() {
+            const select = document.getElementById('ledger-item-filter');
+            select.innerHTML = '<option value="">All Items</option>' + 
+                inventory.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
+        }
+
+        function updateLedgerDisplay() {
+            const tbody = document.getElementById('ledger-table');
+            const filteredTransactions = getFilteredTransactions();
+            
+            if (filteredTransactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No ledger entries</td></tr>';
+                return;
+            }
+
+            // Calculate running balance
+            let balance = 0;
+            tbody.innerHTML = filteredTransactions.map(t => {
+                if (t.type === 'in') {
+                    balance += parseInt(t.quantity);
+                } else {
+                    balance -= parseInt(t.quantity);
+                }
+                
+                return `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-3 px-4">${t.date}</td>
+                        <td class="py-3 px-4 font-medium">${t.itemName}</td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                                t.type === 'in' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }">
+                                ${t.type === 'in' ? 'Stock In' : 'Stock Out'}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4">${t.type === 'in' ? t.quantity : '-'}</td>
+                        <td class="py-3 px-4">${t.type === 'out' ? t.quantity : '-'}</td>
+                        <td class="py-3 px-4 font-medium">${balance}</td>
+                        <td class="py-3 px-4">${t.notes || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterLedger() {
+            updateLedgerDisplay();
+            showNotification('Ledger filtered successfully!', 'info');
+        }
+
+        function exportLedger() {
+            const filteredTransactions = getFilteredTransactions();
+            
+            if (filteredTransactions.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            let csvContent = 'Date,Item,Transaction Type,In,Out,Balance,Notes\n';
+            let balance = 0;
+            filteredTransactions.forEach(t => {
+                if (t.type === 'in') {
+                    balance += parseInt(t.quantity);
+                } else {
+                    balance -= parseInt(t.quantity);
+                }
+                csvContent += `${t.date},${t.itemName},${t.type === 'in' ? 'Stock In' : 'Stock Out'},${t.type === 'in' ? t.quantity : ''},${t.type === 'out' ? t.quantity : ''},${balance},"${t.notes || ''}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'stock_ledger_' + new Date().toISOString().split('T')[0] + '.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showNotification('CSV exported successfully!', 'success');
+        }
+
+        function exportLedgerPDF() {
+            const filteredTransactions = getFilteredTransactions();
+            
+            if (filteredTransactions.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Add header
+            doc.setFontSize(20);
+            doc.text('Stock Warehouse Management System', 105, 20, { align: 'center' });
+            
+            doc.setFontSize(16);
+            doc.text('Item Ledger Report', 105, 30, { align: 'center' });
+            
+            doc.setFontSize(10);
+            doc.text(`Generated on: ${new Date().toLocaleDateString('en-IN')}`, 20, 45);
+            
+            // Add filter information
+            const itemFilter = document.getElementById('ledger-item-filter').value;
+            const dateFrom = document.getElementById('ledger-date-from').value;
+            const dateTo = document.getElementById('ledger-date-to').value;
+            
+            let filterText = 'Filters: ';
+            if (itemFilter) {
+                const item = inventory.find(i => i.id == itemFilter);
+                filterText += `Item: ${item ? item.name : 'Unknown'} | `;
+            }
+            if (dateFrom) filterText += `From: ${dateFrom} | `;
+            if (dateTo) filterText += `To: ${dateTo} | `;
+            if (filterText === 'Filters: ') filterText += 'None';
+            
+            doc.text(filterText, 20, 52);
+            
+            // Prepare table data
+            const tableData = [];
+            let balance = 0;
+            
+            filteredTransactions.forEach(t => {
+                if (t.type === 'in') {
+                    balance += parseInt(t.quantity);
+                } else {
+                    balance -= parseInt(t.quantity);
+                }
+                
+                tableData.push([
+                    t.date,
+                    t.itemName,
+                    t.type === 'in' ? 'Stock In' : 'Stock Out',
+                    t.type === 'in' ? t.quantity : '-',
+                    t.type === 'out' ? t.quantity : '-',
+                    balance,
+                    t.notes || '-'
+                ]);
+            });
+            
+            // Add table
+            doc.autoTable({
+                head: [['Date', 'Item', 'Transaction', 'In', 'Out', 'Balance', 'Notes']],
+                body: tableData,
+                startY: 60,
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 2
+                },
+                headStyles: {
+                    fillColor: [66, 139, 202],
+                    textColor: 255,
+                    fontStyle: 'bold'
+                },
+                alternateRowStyles: {
+                    fillColor: [245, 245, 245]
+                },
+                columnStyles: {
+                    0: { cellWidth: 25 }, // Date
+                    1: { cellWidth: 35 }, // Item
+                    2: { cellWidth: 25 }, // Transaction
+                    3: { cellWidth: 15 }, // In
+                    4: { cellWidth: 15 }, // Out
+                    5: { cellWidth: 20 }, // Balance
+                    6: { cellWidth: 35 }  // Notes
+                }
+            });
+            
+            // Add footer
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.text(`Page ${i} of ${pageCount}`, 105, 285, { align: 'center' });
+                doc.text(`Total Transactions: ${filteredTransactions.length}`, 20, 285);
+            }
+            
+            // Save the PDF
+            doc.save('stock_ledger_' + new Date().toISOString().split('T')[0] + '.pdf');
+            showNotification('PDF exported successfully!', 'success');
+        }
+
+        function printLedger() {
+            const filteredTransactions = getFilteredTransactions();
+            
+            if (filteredTransactions.length === 0) {
+                alert('No data to print');
+                return;
+            }
+
+            // Update print information
+            document.getElementById('print-date').textContent = new Date().toLocaleDateString('en-IN');
+            
+            // Update filter information for print
+            const itemFilter = document.getElementById('ledger-item-filter').value;
+            const dateFrom = document.getElementById('ledger-date-from').value;
+            const dateTo = document.getElementById('ledger-date-to').value;
+            
+            let filterText = 'Filters Applied: ';
+            if (itemFilter) {
+                const item = inventory.find(i => i.id == itemFilter);
+                filterText += `Item: ${item ? item.name : 'Unknown'} | `;
+            }
+            if (dateFrom) filterText += `From: ${dateFrom} | `;
+            if (dateTo) filterText += `To: ${dateTo} | `;
+            if (filterText === 'Filters Applied: ') filterText += 'None';
+            
+            document.getElementById('print-filters').textContent = filterText;
+            
+            // Trigger print
+            window.print();
+            showNotification('Print dialog opened!', 'info');
+        }
+
+        function getFilteredTransactions() {
+            let filteredTransactions = [...transactions];
+            
+            // Apply filters
+            const itemFilter = document.getElementById('ledger-item-filter').value;
+            const dateFrom = document.getElementById('ledger-date-from').value;
+            const dateTo = document.getElementById('ledger-date-to').value;
+            
+            if (itemFilter) {
+                filteredTransactions = filteredTransactions.filter(t => t.itemId == itemFilter);
+            }
+            if (dateFrom) {
+                filteredTransactions = filteredTransactions.filter(t => t.date >= dateFrom);
+            }
+            if (dateTo) {
+                filteredTransactions = filteredTransactions.filter(t => t.date <= dateTo);
+            }
+            
+            return filteredTransactions;
+        }
+
+        // Search inventory
+        function searchInventory() {
+            const searchTerm = document.getElementById('inventory-search').value.toLowerCase();
+            const filteredInventory = inventory.filter(item => 
+                item.name.toLowerCase().includes(searchTerm) ||
+                item.category.toLowerCase().includes(searchTerm)
+            );
+            updateInventoryTableWithData(filteredInventory);
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white font-medium z-50 fade-in ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 
+                'bg-blue-500'
+            }`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('transaction-item-dropdown');
+            const searchInput = document.getElementById('transaction-item-search');
+            
+            if (!dropdown.contains(event.target) && event.target !== searchInput) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        // Initialize the application
+        loadConfig();
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'969d2995d45f45af',t:'MTc1NDMwMTE1Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
