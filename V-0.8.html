@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Warehouse Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">📦 Stock Warehouse Management</h1>
+            <p class="text-gray-600">Manage inventory, track transactions, and maintain item ledgers</p>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-white rounded-xl shadow-lg mb-8">
+            <div class="flex border-b">
+                <button onclick="showTab('dashboard')" id="tab-dashboard" class="px-6 py-4 font-medium text-blue-600 border-b-2 border-blue-600">Dashboard</button>
+                <button onclick="showTab('inventory')" id="tab-inventory" class="px-6 py-4 font-medium text-gray-500 hover:text-gray-700">Inventory</button>
+                <button onclick="showTab('transactions')" id="tab-transactions" class="px-6 py-4 font-medium text-gray-500 hover:text-gray-700">Transactions</button>
+                <button onclick="showTab('ledger')" id="tab-ledger" class="px-6 py-4 font-medium text-gray-500 hover:text-gray-700">Item Ledger</button>
+            </div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard-content" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Items</p>
+                            <p class="text-2xl font-bold text-gray-800" id="total-items">0</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <span class="text-2xl">📋</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Stock Value</p>
+                            <p class="text-2xl font-bold text-gray-800" id="total-value">$0</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <span class="text-2xl">💰</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Low Stock Items</p>
+                            <p class="text-2xl font-bold text-red-600" id="low-stock">0</p>
+                        </div>
+                        <div class="bg-red-100 p-3 rounded-full">
+                            <span class="text-2xl">⚠️</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Recent Transactions</h3>
+                <div id="recent-transactions" class="space-y-3">
+                    <p class="text-gray-500">No recent transactions</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Tab -->
+        <div id="inventory-content" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4" id="form-title">Add New Item</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <input type="text" id="item-name" placeholder="Item Name" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="text" id="item-category" placeholder="Category" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="number" id="item-quantity" placeholder="Quantity" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="number" id="item-price" placeholder="Unit Price (Rs)" step="0.01" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <div class="mt-4">
+                    <button onclick="saveItem()" id="save-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">Add Item</button>
+                    <button onclick="cancelEdit()" id="cancel-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors ml-2 hidden">Cancel</button>
+                    <button onclick="deleteCurrentItem()" id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors ml-2 hidden">🗑️ Delete Item</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">Current Inventory</h3>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-gray-600">🔍</span>
+                        <input type="text" id="inventory-search" placeholder="Search items..." class="border border-gray-300 rounded-lg px-4 py-2 w-64 focus:ring-2 focus:ring-blue-500 focus:border-transparent" onkeyup="searchInventory()">
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Item Name</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Category</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Quantity</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Unit Price</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Total Value</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Status</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table">
+                            <tr>
+                                <td colspan="7" class="text-center py-8 text-gray-500">No items in inventory</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Tab -->
+        <div id="transactions-content" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4" id="transaction-form-title">Record Transaction</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="relative">
+                        <input type="text" id="transaction-item-search" placeholder="Search and select item..." class="border border-gray-300 rounded-lg px-4 py-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent" onclick="toggleItemDropdown()" onkeyup="filterTransactionItems()">
+                        <div id="transaction-item-dropdown" class="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-48 overflow-y-auto hidden shadow-lg">
+                            <div class="p-2 text-gray-500 text-sm">No items found</div>
+                        </div>
+                        <input type="hidden" id="transaction-item" value="">
+                    </div>
+                    <select id="transaction-type" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="in">Stock In</option>
+                        <option value="out">Stock Out</option>
+                    </select>
+                    <input type="number" id="transaction-quantity" placeholder="Quantity" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="text" id="transaction-notes" placeholder="Notes (optional)" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <div class="mt-4">
+                    <button onclick="recordTransaction()" id="transaction-save-btn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">Record Transaction</button>
+                    <button onclick="cancelTransactionEdit()" id="transaction-cancel-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors ml-2 hidden">Cancel</button>
+                    <button onclick="deleteCurrentTransaction()" id="transaction-delete-btn" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors ml-2 hidden">🗑️ Delete Transaction</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Transaction History</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Date</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Item</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Type</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Quantity</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Notes</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactions-table">
+                            <tr>
+                                <td colspan="5" class="text-center py-8 text-gray-500">No transactions recorded</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ledger Tab -->
+        <div id="ledger-content" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Item Ledger Filter</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <select id="ledger-item-filter" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">All Items</option>
+                    </select>
+                    <input type="date" id="ledger-date-from" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <input type="date" id="ledger-date-to" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <div class="mt-4">
+                    <button onclick="filterLedger()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">Apply Filter</button>
+                    <button onclick="exportLedger()" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-medium transition-colors ml-2">Export CSV</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Item Ledger</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Date</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Item</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Transaction</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">In</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Out</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Balance</th>
+                                <th class="text-left py-3 px-4 font-medium text-gray-700">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledger-table">
+                            <tr>
+                                <td colspan="7" class="text-center py-8 text-gray-500">No ledger entries</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data storage
+        let inventory = [];
+        let transactions = [];
+        let currentTab = 'dashboard';
+        let editingItemId = null;
+        let editingTransactionId = null;
+
+        // Initialize with sample data
+        function initializeSampleData() {
+            inventory = [
+                { id: 1, name: 'Laptop Computer', category: 'Electronics', quantity: 25, price: 75000 },
+                { id: 2, name: 'Office Chair', category: 'Furniture', quantity: 15, price: 20000 },
+                { id: 3, name: 'Printer Paper', category: 'Supplies', quantity: 100, price: 1000 }
+            ];
+            
+            transactions = [
+                { id: 1, itemId: 1, itemName: 'Laptop Computer', type: 'in', quantity: 10, date: new Date().toISOString().split('T')[0], notes: 'Initial stock' },
+                { id: 2, itemId: 2, itemName: 'Office Chair', type: 'out', quantity: 5, date: new Date().toISOString().split('T')[0], notes: 'Office setup' }
+            ];
+            
+            updateAllDisplays();
+        }
+
+        // Tab management
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('[id^="tab-"]').forEach(btn => {
+                btn.classList.remove('text-blue-600', 'border-blue-600');
+                btn.classList.add('text-gray-500');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-content').classList.remove('hidden');
+            document.getElementById('tab-' + tabName).classList.add('text-blue-600', 'border-blue-600');
+            document.getElementById('tab-' + tabName).classList.remove('text-gray-500');
+            
+            currentTab = tabName;
+            
+            if (tabName === 'transactions') {
+                updateTransactionItemSelect();
+            }
+            if (tabName === 'ledger') {
+                updateLedgerItemSelect();
+                updateLedgerDisplay();
+            }
+        }
+
+        // Save item (add or edit)
+        function saveItem() {
+            const name = document.getElementById('item-name').value.trim();
+            const category = document.getElementById('item-category').value.trim();
+            const quantity = parseInt(document.getElementById('item-quantity').value) || 0;
+            const price = parseFloat(document.getElementById('item-price').value) || 0;
+
+            if (!name || !category) {
+                alert('Please fill in item name and category');
+                return;
+            }
+
+            if (editingItemId) {
+                // Edit existing item
+                const item = inventory.find(i => i.id === editingItemId);
+                if (item) {
+                    item.name = name;
+                    item.category = category;
+                    item.quantity = quantity;
+                    item.price = price;
+                    showNotification('Item updated successfully!', 'success');
+                }
+                cancelEdit();
+            } else {
+                // Add new item
+                const newItem = {
+                    id: Date.now(),
+                    name,
+                    category,
+                    quantity,
+                    price
+                };
+                inventory.push(newItem);
+                showNotification('Item added successfully!', 'success');
+            }
+            
+            // Clear form
+            clearForm();
+            updateAllDisplays();
+        }
+
+        // Edit item
+        function editItem(id) {
+            const item = inventory.find(i => i.id === id);
+            if (!item) return;
+
+            editingItemId = id;
+            
+            // Fill form with item data
+            document.getElementById('item-name').value = item.name;
+            document.getElementById('item-category').value = item.category;
+            document.getElementById('item-quantity').value = item.quantity;
+            document.getElementById('item-price').value = item.price;
+            
+            // Update UI for edit mode
+            document.getElementById('form-title').textContent = 'Edit Item';
+            document.getElementById('save-btn').textContent = 'Update Item';
+            document.getElementById('save-btn').className = 'bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-medium transition-colors';
+            document.getElementById('cancel-btn').classList.remove('hidden');
+            document.getElementById('delete-btn').classList.remove('hidden');
+        }
+
+        // Delete item
+        function deleteItem(id) {
+            console.log('Delete function called with ID:', id);
+            
+            if (confirm('Are you sure you want to delete this item? This will also remove all related transactions.')) {
+                // Find the item to confirm it exists
+                const itemToDelete = inventory.find(i => i.id === id);
+                if (!itemToDelete) {
+                    alert('Item not found!');
+                    return;
+                }
+                
+                console.log('Deleting item:', itemToDelete.name);
+                
+                // Remove item from inventory
+                inventory = inventory.filter(i => i.id !== id);
+                // Remove related transactions
+                transactions = transactions.filter(t => t.itemId !== id);
+                
+                // Clear search field and update displays
+                document.getElementById('inventory-search').value = '';
+                updateAllDisplays();
+                
+                showNotification(`Item "${itemToDelete.name}" deleted successfully!`, 'success');
+                console.log('Item deleted successfully');
+            }
+        }
+
+        // Cancel edit
+        function cancelEdit() {
+            editingItemId = null;
+            clearForm();
+            
+            // Reset UI to add mode
+            document.getElementById('form-title').textContent = 'Add New Item';
+            document.getElementById('save-btn').textContent = 'Add Item';
+            document.getElementById('save-btn').className = 'bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors';
+            document.getElementById('cancel-btn').classList.add('hidden');
+            document.getElementById('delete-btn').classList.add('hidden');
+        }
+
+        // Delete current item being edited
+        function deleteCurrentItem() {
+            if (editingItemId) {
+                deleteItem(editingItemId);
+                cancelEdit();
+            }
+        }
+
+        // Clear form
+        function clearForm() {
+            document.getElementById('item-name').value = '';
+            document.getElementById('item-category').value = '';
+            document.getElementById('item-quantity').value = '';
+            document.getElementById('item-price').value = '';
+        }
+
+        // Record transaction
+        function recordTransaction() {
+            const itemId = parseInt(document.getElementById('transaction-item').value);
+            const type = document.getElementById('transaction-type').value;
+            const quantity = parseInt(document.getElementById('transaction-quantity').value) || 0;
+            const notes = document.getElementById('transaction-notes').value.trim();
+
+            if (!itemId || quantity <= 0) {
+                alert('Please select an item and enter a valid quantity');
+                return;
+            }
+
+            const item = inventory.find(i => i.id === itemId);
+            if (!item) {
+                alert('Item not found');
+                return;
+            }
+
+            if (editingTransactionId) {
+                // Edit existing transaction
+                const transaction = transactions.find(t => t.id === editingTransactionId);
+                if (!transaction) {
+                    alert('Transaction not found');
+                    return;
+                }
+
+                // Reverse the old transaction effect on inventory
+                const oldItem = inventory.find(i => i.id === transaction.itemId);
+                if (oldItem) {
+                    if (transaction.type === 'in') {
+                        oldItem.quantity -= transaction.quantity;
+                    } else {
+                        oldItem.quantity += transaction.quantity;
+                    }
+                }
+
+                // Check if new transaction is valid
+                if (type === 'out' && item.quantity < quantity) {
+                    // Restore old transaction effect
+                    if (transaction.type === 'in') {
+                        oldItem.quantity += transaction.quantity;
+                    } else {
+                        oldItem.quantity -= transaction.quantity;
+                    }
+                    alert('Insufficient stock! Available: ' + item.quantity);
+                    return;
+                }
+
+                // Apply new transaction effect
+                if (type === 'in') {
+                    item.quantity += quantity;
+                } else {
+                    item.quantity -= quantity;
+                }
+
+                // Update transaction
+                transaction.itemId = item.id;
+                transaction.itemName = item.name;
+                transaction.type = type;
+                transaction.quantity = quantity;
+                transaction.notes = notes;
+
+                showNotification('Transaction updated successfully!', 'success');
+                cancelTransactionEdit();
+            } else {
+                // Add new transaction
+                if (type === 'out' && item.quantity < quantity) {
+                    alert('Insufficient stock! Available: ' + item.quantity);
+                    return;
+                }
+
+                // Update inventory
+                if (type === 'in') {
+                    item.quantity += quantity;
+                } else {
+                    item.quantity -= quantity;
+                }
+
+                // Record transaction
+                const transaction = {
+                    id: Date.now(),
+                    itemId: item.id,
+                    itemName: item.name,
+                    type,
+                    quantity,
+                    date: new Date().toISOString().split('T')[0],
+                    notes
+                };
+
+                transactions.push(transaction);
+                showNotification('Transaction recorded successfully!', 'success');
+            }
+
+            // Clear form
+            clearTransactionForm();
+            updateAllDisplays();
+        }
+
+        // Edit transaction
+        function editTransaction(id) {
+            const transaction = transactions.find(t => t.id === id);
+            if (!transaction) return;
+
+            editingTransactionId = id;
+            
+            // Fill form with transaction data
+            const item = inventory.find(i => i.id === transaction.itemId);
+            if (item) {
+                document.getElementById('transaction-item').value = transaction.itemId;
+                document.getElementById('transaction-item-search').value = `${transaction.itemName} (Stock: ${item.quantity})`;
+            }
+            document.getElementById('transaction-type').value = transaction.type;
+            document.getElementById('transaction-quantity').value = transaction.quantity;
+            document.getElementById('transaction-notes').value = transaction.notes || '';
+            
+            // Update UI for edit mode
+            document.getElementById('transaction-form-title').textContent = 'Edit Transaction';
+            document.getElementById('transaction-save-btn').textContent = 'Update Transaction';
+            document.getElementById('transaction-save-btn').className = 'bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-medium transition-colors';
+            document.getElementById('transaction-cancel-btn').classList.remove('hidden');
+            document.getElementById('transaction-delete-btn').classList.remove('hidden');
+        }
+
+        // Delete transaction
+        function deleteTransaction(id) {
+            if (confirm('Are you sure you want to delete this transaction?')) {
+                const transaction = transactions.find(t => t.id === id);
+                if (!transaction) {
+                    alert('Transaction not found!');
+                    return;
+                }
+
+                // Reverse the transaction effect on inventory
+                const item = inventory.find(i => i.id === transaction.itemId);
+                if (item) {
+                    if (transaction.type === 'in') {
+                        item.quantity -= transaction.quantity;
+                    } else {
+                        item.quantity += transaction.quantity;
+                    }
+                }
+
+                // Remove transaction
+                transactions = transactions.filter(t => t.id !== id);
+                
+                updateAllDisplays();
+                showNotification(`Transaction deleted successfully!`, 'success');
+            }
+        }
+
+        // Cancel transaction edit
+        function cancelTransactionEdit() {
+            editingTransactionId = null;
+            clearTransactionForm();
+            
+            // Reset UI to add mode
+            document.getElementById('transaction-form-title').textContent = 'Record Transaction';
+            document.getElementById('transaction-save-btn').textContent = 'Record Transaction';
+            document.getElementById('transaction-save-btn').className = 'bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors';
+            document.getElementById('transaction-cancel-btn').classList.add('hidden');
+            document.getElementById('transaction-delete-btn').classList.add('hidden');
+        }
+
+        // Delete current transaction being edited
+        function deleteCurrentTransaction() {
+            if (editingTransactionId) {
+                deleteTransaction(editingTransactionId);
+                cancelTransactionEdit();
+            }
+        }
+
+        // Clear transaction form
+        function clearTransactionForm() {
+            document.getElementById('transaction-item').value = '';
+            document.getElementById('transaction-item-search').value = '';
+            document.getElementById('transaction-quantity').value = '';
+            document.getElementById('transaction-notes').value = '';
+        }
+
+        // Update displays
+        function updateAllDisplays() {
+            updateDashboard();
+            updateInventoryTable();
+            updateTransactionsTable();
+            updateLedgerDisplay();
+        }
+
+        function updateDashboard() {
+            const totalItems = inventory.length;
+            const totalValue = inventory.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+            const lowStockItems = inventory.filter(item => item.quantity < 10).length;
+
+            document.getElementById('total-items').textContent = totalItems;
+            document.getElementById('total-value').textContent = 'Rs ' + totalValue.toFixed(2);
+            document.getElementById('low-stock').textContent = lowStockItems;
+
+            // Recent transactions
+            const recentTransactions = transactions.slice(-5).reverse();
+            const recentHtml = recentTransactions.length > 0 
+                ? recentTransactions.map(t => `
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                        <div>
+                            <span class="font-medium">${t.itemName}</span>
+                            <span class="text-sm text-gray-500 ml-2">${t.type === 'in' ? '📥' : '📤'} ${t.quantity}</span>
+                        </div>
+                        <span class="text-sm text-gray-500">${t.date}</span>
+                    </div>
+                `).join('')
+                : '<p class="text-gray-500">No recent transactions</p>';
+            
+            document.getElementById('recent-transactions').innerHTML = recentHtml;
+        }
+
+        function updateInventoryTable() {
+            // Clear search when updating full inventory
+            document.getElementById('inventory-search').value = '';
+            updateInventoryTableWithData(inventory);
+        }
+
+        function updateTransactionItemSelect() {
+            const dropdown = document.getElementById('transaction-item-dropdown');
+            if (inventory.length === 0) {
+                dropdown.innerHTML = '<div class="p-2 text-gray-500 text-sm">No items available</div>';
+                return;
+            }
+            
+            dropdown.innerHTML = inventory.map(item => `
+                <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0" onclick="selectTransactionItem(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.quantity})">
+                    <div class="font-medium text-gray-800">${item.name}</div>
+                    <div class="text-sm text-gray-500">Stock: ${item.quantity} | Category: ${item.category}</div>
+                </div>
+            `).join('');
+        }
+
+        function toggleItemDropdown() {
+            const dropdown = document.getElementById('transaction-item-dropdown');
+            const searchInput = document.getElementById('transaction-item-search');
+            
+            if (dropdown.classList.contains('hidden')) {
+                updateTransactionItemSelect();
+                dropdown.classList.remove('hidden');
+                searchInput.focus();
+            } else {
+                dropdown.classList.add('hidden');
+            }
+        }
+
+        function filterTransactionItems() {
+            const searchTerm = document.getElementById('transaction-item-search').value.toLowerCase();
+            const dropdown = document.getElementById('transaction-item-dropdown');
+            
+            if (searchTerm === '') {
+                updateTransactionItemSelect();
+                return;
+            }
+            
+            const filteredItems = inventory.filter(item => 
+                item.name.toLowerCase().includes(searchTerm) ||
+                item.category.toLowerCase().includes(searchTerm)
+            );
+            
+            if (filteredItems.length === 0) {
+                dropdown.innerHTML = '<div class="p-2 text-gray-500 text-sm">No items found</div>';
+                return;
+            }
+            
+            dropdown.innerHTML = filteredItems.map(item => `
+                <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0" onclick="selectTransactionItem(${item.id}, '${item.name.replace(/'/g, "\\'")}', ${item.quantity})">
+                    <div class="font-medium text-gray-800">${item.name}</div>
+                    <div class="text-sm text-gray-500">Stock: ${item.quantity} | Category: ${item.category}</div>
+                </div>
+            `).join('');
+            
+            dropdown.classList.remove('hidden');
+        }
+
+        function selectTransactionItem(id, name, stock) {
+            document.getElementById('transaction-item').value = id;
+            document.getElementById('transaction-item-search').value = `${name} (Stock: ${stock})`;
+            document.getElementById('transaction-item-dropdown').classList.add('hidden');
+        }
+
+        function updateTransactionsTable() {
+            const tbody = document.getElementById('transactions-table');
+            
+            if (transactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No transactions recorded</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = transactions.slice().reverse().map(t => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4">${t.date}</td>
+                    <td class="py-3 px-4 font-medium">${t.itemName}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                            t.type === 'in' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }">
+                            ${t.type === 'in' ? '📥 Stock In' : '📤 Stock Out'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">${t.quantity}</td>
+                    <td class="py-3 px-4">${t.notes || '-'}</td>
+                    <td class="py-3 px-4">
+                        <button onclick="editTransaction(${t.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium mr-2 transition-colors">
+                            ✏️ Edit
+                        </button>
+                        <button onclick="deleteTransaction(${t.id})" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors">
+                            🗑️ Delete
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateLedgerItemSelect() {
+            const select = document.getElementById('ledger-item-filter');
+            select.innerHTML = '<option value="">All Items</option>' + 
+                inventory.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
+        }
+
+        function updateLedgerDisplay() {
+            const tbody = document.getElementById('ledger-table');
+            let filteredTransactions = [...transactions];
+            
+            // Apply filters
+            const itemFilter = document.getElementById('ledger-item-filter').value;
+            const dateFrom = document.getElementById('ledger-date-from').value;
+            const dateTo = document.getElementById('ledger-date-to').value;
+            
+            if (itemFilter) {
+                filteredTransactions = filteredTransactions.filter(t => t.itemId == itemFilter);
+            }
+            if (dateFrom) {
+                filteredTransactions = filteredTransactions.filter(t => t.date >= dateFrom);
+            }
+            if (dateTo) {
+                filteredTransactions = filteredTransactions.filter(t => t.date <= dateTo);
+            }
+            
+            if (filteredTransactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No ledger entries</td></tr>';
+                return;
+            }
+
+            // Calculate running balance
+            let balance = 0;
+            tbody.innerHTML = filteredTransactions.map(t => {
+                if (t.type === 'in') {
+                    balance += t.quantity;
+                } else {
+                    balance -= t.quantity;
+                }
+                
+                return `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-3 px-4">${t.date}</td>
+                        <td class="py-3 px-4 font-medium">${t.itemName}</td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                                t.type === 'in' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }">
+                                ${t.type === 'in' ? 'Stock In' : 'Stock Out'}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4">${t.type === 'in' ? t.quantity : '-'}</td>
+                        <td class="py-3 px-4">${t.type === 'out' ? t.quantity : '-'}</td>
+                        <td class="py-3 px-4 font-medium">${balance}</td>
+                        <td class="py-3 px-4">${t.notes || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterLedger() {
+            updateLedgerDisplay();
+            showNotification('Ledger filtered successfully!', 'info');
+        }
+
+        function exportLedger() {
+            const filteredTransactions = [...transactions];
+            
+            if (filteredTransactions.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            let csvContent = 'Date,Item,Transaction Type,In,Out,Notes\n';
+            filteredTransactions.forEach(t => {
+                csvContent += `${t.date},${t.itemName},${t.type === 'in' ? 'Stock In' : 'Stock Out'},${t.type === 'in' ? t.quantity : ''},${t.type === 'out' ? t.quantity : ''},"${t.notes || ''}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'stock_ledger_' + new Date().toISOString().split('T')[0] + '.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showNotification('Ledger exported successfully!', 'success');
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white font-medium z-50 fade-in ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 
+                'bg-blue-500'
+            }`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Search inventory
+        function searchInventory() {
+            const searchTerm = document.getElementById('inventory-search').value.toLowerCase();
+            const filteredInventory = inventory.filter(item => 
+                item.name.toLowerCase().includes(searchTerm) ||
+                item.category.toLowerCase().includes(searchTerm)
+            );
+            updateInventoryTableWithData(filteredInventory);
+        }
+
+        // Update inventory table with specific data
+        function updateInventoryTableWithData(data) {
+            const tbody = document.getElementById('inventory-table');
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No items found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(item => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4 font-medium">${item.name}</td>
+                    <td class="py-3 px-4">${item.category}</td>
+                    <td class="py-3 px-4">${item.quantity}</td>
+                    <td class="py-3 px-4">Rs ${item.price.toFixed(2)}</td>
+                    <td class="py-3 px-4">Rs ${(item.quantity * item.price).toFixed(2)}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                            item.quantity < 10 ? 'bg-red-100 text-red-800' : 
+                            item.quantity < 50 ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-green-100 text-green-800'
+                        }">
+                            ${item.quantity < 10 ? 'Low Stock' : item.quantity < 50 ? 'Medium' : 'Good'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <button onclick="editItem(${item.id})" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium mr-2 transition-colors">
+                            ✏️ Edit
+                        </button>
+                        <button onclick="deleteItem(${item.id})" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors">
+                            🗑️ Delete
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('transaction-item-dropdown');
+            const searchInput = document.getElementById('transaction-item-search');
+            
+            if (!dropdown.contains(event.target) && event.target !== searchInput) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        // Initialize the application
+        initializeSampleData();
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'969d5351d24151de',t:'MTc1NDMwMjg2MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
